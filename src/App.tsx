@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState, useRef } from "react";
+import { flippers } from "./data/flippers";
 import { motion } from "framer-motion";
-import { ArrowRight, Coins, Sparkles, Wallet, Twitter, Github, Mail, ExternalLink, Shield, ChevronRight, Copy, CheckCircle2 } from "lucide-react";
+import { ArrowRight, Coins, Sparkles, Wallet, Twitter, Github, Mail, ExternalLink, Shield, ChevronRight, Copy, CheckCircle2, QrCode, Link as LinkIcon } from "lucide-react";
 
 /**
  * FIATCOIN — Tribute to XRP + Presale Site (React SPA)
@@ -36,6 +37,37 @@ const XRPL_WS = "wss://xrplcluster.com"; // Public XRPL WebSocket cluster
 // Social + contact (single source of truth)
 const SOCIAL_X = "https://x.com/fiatcoinxrp";
 const CONTACT_EMAIL = "fiatcoinxrp@gmail.com";
+// Mantra / quote constants
+const MANTRA = "More honest money than fiat.";
+const MANTRA_ATTRIBUTION = {
+  note: "Quote from David “JoelKatz” Schwartz (used in satirical/meme context).",
+  tweetUrl: "https://twitter.com/JoelKatz/status/1678710724200128513",
+};
+
+// Optional: 50/50 tokenomics model for presale math (UI remains unchanged)
+const TOKENOMICS = {
+  totalSupply: 100_000_000_000,
+  presalePct: 0.50,
+  liquidityPct: 0.50,
+  pairPctOfPresaleXrp: 0.51,
+};
+
+function computeRates({ targetXrp, raisedXrp }: { targetXrp: number; raisedXrp: number }) {
+  const presaleTokens = TOKENOMICS.totalSupply * TOKENOMICS.presalePct;
+  const liquidityTokens = TOKENOMICS.totalSupply * TOKENOMICS.liquidityPct;
+  const fiatsPerXrp_ifTarget = targetXrp > 0 ? presaleTokens / targetXrp : null;
+  const fiatsPerXrp_current = raisedXrp > 0 ? presaleTokens / raisedXrp : null;
+  const pairedXrp_ifTarget = targetXrp * TOKENOMICS.pairPctOfPresaleXrp;
+  const pairedXrp_current = raisedXrp * TOKENOMICS.pairPctOfPresaleXrp;
+  const poolFiatsPerXrp_ifTarget = targetXrp > 0 ? (liquidityTokens / pairedXrp_ifTarget) : null;
+  const poolFiatsPerXrp_current = raisedXrp > 0 ? (liquidityTokens / pairedXrp_current) : null;
+  return {
+    presaleTokens, liquidityTokens,
+    fiatsPerXrp_ifTarget, fiatsPerXrp_current,
+    poolFiatsPerXrp_ifTarget, poolFiatsPerXrp_current,
+    pairedXrp_ifTarget, pairedXrp_current,
+  };
+}
 
 // ──────────────────────────────────────────────────────────────────────────────
 // Minimal XRPL client (no external deps). Works in browser using WebSocket.
@@ -136,6 +168,7 @@ export function parseHashRoute(hash: string): Route {
     const slug = raw.slice("#/flipper/".length).split("?")[0].split("#")[0];
     return { view: "flipper", slug };
   }
+  if (raw.startsWith("#/claim")) return { view: "home" } as Route; // allow in-page claim section anchor
   return { view: "home" };
 }
 
@@ -143,13 +176,13 @@ export function parseHashRoute(hash: string): Route {
 // Logo handling with fallbacks & query param (?logo=)
 const PLACEHOLDER_DATA = (() => {
   const svg = encodeURIComponent(
-    `<svg xmlns='http://www.w3.org/2000/svg' width='512' height='512'>`
+    `<svg xmlns='x////////////vorg/2000/svg' width='512' height='512'>`
     + `<rect width='100%' height='100%' fill='white'/>`
     + `<text x='50%' y='54%' dominant-baseline='middle' text-anchor='middle'`
     + ` font-family='system-ui,Segoe UI,Inter,sans-serif' font-size='240' fill='black'>$</text>`
     + `</svg>`
   );
-  return `data:image/svg+xml;charset=UTF-8,${svg}`;
+  return `data:image/svg+xml;cha aat=UTF-8,${svg}`;
 })();
 function buildLogoSources() {
   try {
@@ -255,6 +288,7 @@ export default function App() {
         {route.view === "home" && (
           <>
             <Hero />
+            <TeaseBanner target={PRESALE_TARGET_XRP} percent={percent} />
             <Presale
               xns={PRESALE_XNS}
               onCopyXns={copyXns}
@@ -266,7 +300,9 @@ export default function App() {
               onCopyAddr={copyAddr}
               copiedAddr={copiedAddr}
             />
+            <Claim />
             <Tokenomics />
+            <UseOfFunds />
             <XrpTribute />
             <FlipperIndex />
             <HowToBuy />
@@ -274,6 +310,7 @@ export default function App() {
             <Disclaimers />
             <Contact />
             <Diagnostics xrplLite={xrplLite} />
+            <Tests />
           </>
         )}
         {route.view === "flipper" && (
@@ -341,6 +378,10 @@ function Hero() {
             <strong>FIATCOIN</strong> is a playful tribute to the builders and believers in XRP. We meme the past, celebrate the present, and ship for the future—
             with a nod to the legends who helped bring utility to crypto.
           </p>
+          <blockquote className="text-white/80 text-sm border-l-2 border-white/20 pl-3">
+            “If someone created a FiatCoin, backed by nothing and issued by decree, would it be more honest than most fiat currencies?”
+            <div className="text-white/50 text-xs mt-1">— David “JoelKatz” Schwartz</div>
+          </blockquote>
           <div className="flex flex-wrap gap-3">
             <a href="#presale" className="inline-flex items-center gap-2 rounded-2xl bg-white text-black px-4 py-2 font-semibold">
               Join Presale <ArrowRight className="h-4 w-4" />
@@ -360,6 +401,49 @@ function Hero() {
   );
 }
 
+function TeaseBanner({ target, percent }: { target: number; percent: number }) {
+  return (
+    <section id="tease" className="py-10">
+      <div className="rounded-3xl bg-white/5 ring-1 ring-white/10 p-6 md:p-8">
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-6">
+          <div>
+            <h2 className="text-2xl md:text-3xl font-bold">
+              JoelKatz-y Challenge: Can a meme coordinate {fmt(target)} XRP?
+            </h2>
+            <p className="text-white/70 mt-2 max-w-prose">
+              <strong>Hypothesis:</strong> if you give a community a target and a ledger, the ledger settles truth, not promises.
+              We’re aiming for <strong>{fmt(target)} XRP</strong>. If we hit it, <strong>51%</strong> of the XRP goes
+              straight into LP with the <strong>70% liquidity allocation</strong>. If we don’t, the math still works and the joke stays funny.
+            </p>
+            <ul className="text-sm text-white/60 mt-3 space-y-1 list-disc list-inside">
+              <li>“By decree” is for fiat. Memes earn consensus.</li>
+              <li>No bonding curve, no mystery unlocks, no market-maker idols.</li>
+              <li>The ledger won’t applaud—only your wallet can.</li>
+            </ul>
+          </div>
+
+          <div className="shrink-0 w-full md:w-72">
+            <div className="text-sm text-white/60">Progress</div>
+            <div className="mt-1 h-2 rounded-full bg-white/10">
+              <div className="h-2 rounded-full bg-white" style={{ width: `${percent}%` }} />
+            </div>
+            <div className="mt-2 text-sm font-semibold">
+              {fmt(percent, { maximumFractionDigits: 2 })}% of {fmt(target)} XRP
+            </div>
+            <a href="#presale" className="mt-4 inline-flex items-center gap-2 rounded-2xl bg-white text-black px-4 py-2 font-semibold">
+              Prove the meme <ArrowRight className="h-4 w-4" />
+            </a>
+          </div>
+        </div>
+
+        <div className="mt-3 text-xs text-white/50">
+          Parody tone. Not financial advice. If your threat model includes jokes, stop here.
+        </div>
+      </div>
+    </section>
+  );
+}
+
 function Presale({ address, target, raised, percent, onCopyAddr, copiedAddr, xns, onCopyXns, copiedXns }: { address: string; target: number; raised: number; percent: number; onCopyAddr: () => void; copiedAddr: boolean; xns: string; onCopyXns: () => void; copiedXns: boolean; }) {
   return (
     <section id="presale" className="py-16 border-t border-white/10">
@@ -370,6 +454,18 @@ function Presale({ address, target, raised, percent, onCopyAddr, copiedAddr, xns
           <br />
           <span className="text-white/60">Bringing back 2021 meme-coins energy—fair launch, real community, no bonding curves making someone else’s number go up.</span>
         </p>
+        <div className="mt-3 text-white/70 text-sm">
+          {(() => {
+            const rates = computeRates({ targetXrp: PRESALE_TARGET_XRP, raisedXrp:  Math.max(raised, 0) });
+            const presaleRate = rates.fiatsPerXrp_ifTarget ? fmt(rates.fiatsPerXrp_ifTarget) : "—";
+            const poolRatio = rates.poolFiatsPerXrp_ifTarget ? fmt(Math.round(rates.poolFiatsPerXrp_ifTarget)) : "—";
+            return (
+              <div className="rounded-xl bg-white/5 ring-1 ring-white/10 p-3">
+                <div><strong>At target ({fmt(PRESALE_TARGET_XRP)} XRP):</strong> {presaleRate} FIAT/XRP presale rate; ~{poolRatio} FIAT/XRP initial pool ratio.</div>
+              </div>
+            );
+          })()}
+        </div>
       </div>
 
       <div className="grid lg:grid-cols-2 gap-6">
@@ -540,14 +636,9 @@ function EmbedTweet({ tweetUrl }: { tweetUrl: string }) {
 }
 
 function FlipperPage({ slug }: { slug: string }) {
-  // Inline minimal data to avoid new files if not present; can be replaced by src/data
-  const data: Record<string, { name: string; handle?: string; avatar?: string; summary: string; tweets: string[]; images: string[] }> = {
-    trump: { name: "Donald Trump", handle: "@realDonaldTrump", summary: "From skeptic to builder-friendly rhetoric.", tweets: [], images: [] },
-    cuban: { name: "Mark Cuban", handle: "@mcuban", summary: "Once harsh, now an active crypto infra investor.", tweets: [], images: [] },
-    dimon: { name: "Jamie Dimon", handle: "JPM exec", summary: "Public criticisms vs. institutional adoption.", tweets: [], images: [] },
-    fink: { name: "Larry Fink", handle: "BlackRock", summary: "“Tokenization is the future of markets.”", tweets: [], images: [] },
-  };
-  const item = data[slug];
+  const map: any = {};
+  for (const f of flippers) map[f.slug] = { name: f.name, handle: f.handle, avatar: f.avatar, summary: f.summary, tweets: f.tweetUrls, images: f.images || [] };
+  const item = map[slug];
   if (!item) return (
     <section className="py-16">
       <div className="text-sm text-white/60">Unknown flipper. <a className="underline" href="#/">Go home</a>.</div>
@@ -569,13 +660,35 @@ function FlipperPage({ slug }: { slug: string }) {
       <div className="mt-6 grid md:grid-cols-2 gap-6">
         <div className="space-y-4">
           {item.tweets.length === 0 && <a className="text-sm underline" href={SOCIAL_X} target="_blank" rel="noreferrer">Follow on X for receipts</a>}
-          {item.tweets.map((u, i) => (<EmbedTweet key={i} tweetUrl={u} />))}
+          {item.tweets.map((u: string, i: number) => (<EmbedTweet key={i} tweetUrl={u} />))}
         </div>
         <div className="grid grid-cols-2 gap-3">
-          {item.images.map((src, i) => (<img key={i} src={src} className="rounded-xl ring-1 ring-white/10" />))}
+          {item.images.map((src: string, i: number) => (<img key={i} src={src} className="rounded-xl ring-1 ring-white/10" />))}
         </div>
       </div>
       <div className="mt-6 text-xs text-white/50">Public quotes and images are used under fair use for commentary and satire. Parody—no endorsement. If you’re featured and want a correction, contact <a className="underline" href={`mailto:${CONTACT_EMAIL}`}>{CONTACT_EMAIL}</a>.</div>
+    </section>
+  );
+}
+
+// Museum plaque variant for JoelKatz quote
+function MantraPlaque() {
+  return (
+    <section className="py-12">
+      <div className="rounded-3xl bg-white/5 ring-1 ring-white/10 p-6 md:p-8">
+        <div className="text-sm uppercase tracking-wider text-white/50">Fiat Flip Index Museum</div>
+        <h3 className="mt-3 text-2xl md:text-3xl font-bold">
+          “If someone created a FiatCoin, backed by nothing and issued by decree,
+          would it be more honest than most fiat currencies?”
+        </h3>
+        <div className="mt-2 text-white/60">— David “JoelKatz” Schwartz</div>
+        <div className="mt-4">
+          <EmbedTweet tweetUrl={MANTRA_ATTRIBUTION.tweetUrl} />
+        </div>
+        <p className="mt-4 text-xs text-white/50">
+          Displayed as cultural commentary / satire. The site makes no promises or financial claims.
+        </p>
+      </div>
     </section>
   );
 }
@@ -607,10 +720,10 @@ function HowToBuy() {
 
 // Tokenomics section
 function Tokenomics() {
-  const total = 100_000_000_000;
-  const presalePct = 0.30;
-  const liquidityPct = 0.70;
-  const pairPctOfPresaleFunds = 0.51;
+  const total = TOKENOMICS.totalSupply;
+  const presalePct = TOKENOMICS.presalePct;
+  const liquidityPct = TOKENOMICS.liquidityPct;
+  const pairPctOfPresaleFunds = TOKENOMICS.pairPctOfPresaleXrp;
   const t = computeTokenomics({ total, presalePct, liquidityPct, pairPctOfPresaleFunds });
   const rows = [
     { label: "Presale", value: t.presaleTokens, pct: presalePct, color: "bg-white" },
@@ -644,10 +757,32 @@ function Tokenomics() {
         <div className="rounded-2xl p-5 bg-white/5 ring-1 ring-white/10 text-sm leading-relaxed">
           <ul className="list-disc list-inside space-y-1">
             <li><strong>Total Supply:</strong> {fmt(total)} FIAT</li>
-            <li><strong>Presale Allocation:</strong> 30% ({fmt(t.presaleTokens)} FIAT)</li>
-            <li><strong>Liquidity Allocation:</strong> 70% ({fmt(t.liquidityTokens)} FIAT)</li>
-            <li><strong>Pairing:</strong> 51% of presale XRP will be paired with the 70% liquidity allocation at launch to seed deep liquidity.</li>
+            <li><strong>Presale Allocation:</strong> {fmt(presalePct*100, { maximumFractionDigits: 0 })}% ({fmt(t.presaleTokens)} FIAT)</li>
+            <li><strong>Liquidity Allocation:</strong> {fmt(liquidityPct*100, { maximumFractionDigits: 0 })}% ({fmt(t.liquidityTokens)} FIAT)</li>
+            <li><strong>Pairing:</strong> {fmt(pairPctOfPresaleFunds*100, { maximumFractionDigits: 0 })}% of presale XRP will be paired with the liquidity allocation at launch to seed deep liquidity.</li>
           </ul>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function UseOfFunds() {
+  return (
+    <section className="py-16 border-t border-white/10">
+      <h3 className="text-2xl font-semibold mb-4">Use of Funds</h3>
+      <div className="grid md:grid-cols-3 gap-4 text-sm">
+        <div className="rounded-2xl p-4 bg-white/5 ring-1 ring-white/10">
+          <div className="font-semibold">Liquidity & Stability</div>
+          <div className="text-white/70 mt-1">51% of raise paired with 50B tokens at launch; no bonding curves.</div>
+        </div>
+        <div className="rounded-2xl p-4 bg-white/5 ring-1 ring-white/10">
+          <div className="font-semibold">Heavy Buybacks (34%)</div>
+          <div className="text-white/70 mt-1">TWAP/ladder execution with caps and transparency; unused buffer rolls forward.</div>
+        </div>
+        <div className="rounded-2xl p-4 bg-white/5 ring-1 ring-white/10">
+          <div className="font-semibold">Ops/Marketing (15%)</div>
+          <div className="text-white/70 mt-1">Infra, security reviews, analytics, moderation, creative assets, grants, outreach.</div>
         </div>
       </div>
     </section>
@@ -820,6 +955,117 @@ function ConnectModal({ onClose, onConnectAddress }: { onClose: () => void; onCo
 }
 
 // ──────────────────────────────────────────────────────────────────────────────
+// Claim section (XUMM SignIn → Trustline → Preview → Claim)
+function Claim() {
+  const [account, setAccount] = useState<string>("");
+  const [signin, setSignin] = useState<{ uuid?: string; deeplink?: string; qrPng?: string } | null>(null);
+  const [trust, setTrust] = useState<{ uuid?: string; deeplink?: string; qrPng?: string } | null>(null);
+  const [status, setStatus] = useState<string>("idle");
+  const [preview, setPreview] = useState<string | null>(null);
+  const [claiming, setClaiming] = useState<boolean>(false);
+  const [tx, setTx] = useState<string | null>(null);
+
+  const call = async (path: string, options?: RequestInit) => {
+    const r = await fetch(path, options);
+    if (!r.ok) throw new Error(`${path} ${r.status}`);
+    return r.json();
+  };
+
+  const startSignin = async () => {
+    setStatus("signin"); setSignin(null); setAccount("");
+    try {
+      const res = await call("/api/xumm/authorize", { method: "POST" });
+      setSignin(res);
+      poll(res.uuid, (acc) => { setAccount(acc || ""); setStatus("signed"); });
+    } catch { setStatus("error"); }
+  };
+  const startTrust = async () => {
+    setStatus("trust"); setTrust(null);
+    try {
+      const res = await call("/api/xumm/trustset");
+      setTrust(res);
+      poll(res.uuid, () => { setStatus("trust_ok"); });
+    } catch { setStatus("error"); }
+  };
+  const doPreview = async () => {
+    if (!account) return;
+    setStatus("preview");
+    try {
+      const res = await call(`/api/claim/preview?address=${encodeURIComponent(account)}`);
+      setPreview(res.amount);
+      setStatus("preview_ok");
+    } catch { setStatus("preview_none"); }
+  };
+  const doClaim = async () => {
+    if (!account) return;
+    setClaiming(true);
+    try {
+      const res = await call("/api/claim/start", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ address: account }) });
+      setTx(res.txHash || null);
+      setStatus("claimed");
+    } catch { setStatus("claim_error"); }
+    setClaiming(false);
+  };
+
+  const poll = async (uuid: string, onSigned: (account?: string)=>void) => {
+    let tries = 0;
+    const timer = setInterval(async () => {
+      tries++;
+      try {
+        const r = await call(`/api/xumm/payload/${uuid}`);
+        if (r.status === "signed") { clearInterval(timer); onSigned(r.account); }
+        if (r.status === "rejected") { clearInterval(timer); setStatus("rejected"); }
+      } catch {}
+      if (tries > 90) clearInterval(timer);
+    }, 2000);
+  };
+
+  return (
+    <section id="claim" className="py-16 border-t border-white/10">
+      <div className="mb-6">
+        <h2 className="text-3xl md:text-4xl font-bold">Claim (pre‑LP)</h2>
+        <p className="text-white/70 mt-2 max-w-3xl">Connect Xaman, set a FIAT trustline, preview your allocation, then claim before AMM pool creation.</p>
+      </div>
+      <div className="grid md:grid-cols-3 gap-4">
+        <div className="rounded-2xl p-4 bg-white/5 ring-1 ring-white/10">
+          <div className="font-semibold flex items-center gap-2"><QrCode className="h-4 w-4"/> 1) Connect (SignIn)</div>
+          <div className="text-xs text-white/60 mt-1">Scan QR or use deeplink. We’ll read your r‑address.</div>
+          <div className="mt-3 flex items-center gap-3">
+            <button onClick={startSignin} className="px-3 py-1.5 rounded-xl ring-1 ring-white/20">Start</button>
+            {signin?.qrPng && <img src={signin.qrPng} className="h-16 w-16 rounded"/>}
+            {signin?.deeplink && <a className="text-sm underline inline-flex items-center gap-1" href={signin.deeplink} target="_blank" rel="noreferrer"><LinkIcon className="h-3.5 w-3.5"/>Open</a>}
+          </div>
+          {account && <div className="mt-2 text-xs break-all">Account: {account}</div>}
+        </div>
+
+        <div className="rounded-2xl p-4 bg-white/5 ring-1 ring-white/10">
+          <div className="font-semibold">2) Trustline</div>
+          <div className="text-xs text-white/60 mt-1">Approve FIAT trustline, then we’ll detect it.</div>
+          <div className="mt-3 flex items-center gap-3">
+            <button onClick={startTrust} className="px-3 py-1.5 rounded-xl ring-1 ring-white/20">Set trustline</button>
+            {trust?.qrPng && <img src={trust.qrPng} className="h-16 w-16 rounded"/>}
+            {trust?.deeplink && <a className="text-sm underline" href={trust.deeplink} target="_blank" rel="noreferrer">Open</a>}
+          </div>
+          <div className="mt-2 text-xs">Status: {status}</div>
+        </div>
+
+        <div className="rounded-2xl p-4 bg-white/5 ring-1 ring-white/10">
+          <div className="font-semibold">3) Preview & Claim</div>
+          <div className="text-xs text-white/60 mt-1">We’ll fetch your allocation and submit the issuer payment.</div>
+          <div className="mt-3 flex gap-2">
+            <button onClick={doPreview} className="px-3 py-1.5 rounded-xl ring-1 ring-white/20">Preview</button>
+            <button onClick={doClaim} disabled={!preview || claiming} className="px-3 py-1.5 rounded-xl bg-white text-black disabled:opacity-50">Claim</button>
+          </div>
+          <div className="mt-2 text-sm">You’ll receive: {preview ? `${fmt(preview)} ${FIATCOIN_CURRENCY}` : "—"}</div>
+          {tx && <div className="mt-2 text-xs">Tx: <a className="underline" href={`https://xrpscan.com/tx/${tx}`} target="_blank" rel="noreferrer">{tx}</a></div>}
+        </div>
+      </div>
+      <div className="text-xs text-white/50 mt-4">Copycats exist; never send DMs; always verify <code className="px-1 rounded bg-white/10">{PRESALE_XNS}</code>; trustline requires a small XRPL reserve.</div>
+    </section>
+  );
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
 // Diagnostics (basic connectivity test)
 function Diagnostics({ xrplLite }: { xrplLite: XRPLClientLite }) {
   const [status, setStatus] = useState("idle");
@@ -856,6 +1102,71 @@ function Diagnostics({ xrplLite }: { xrplLite: XRPLClientLite }) {
   );
 }
 
-// (Removed in-app unit tests panel for production build)
+// ──────────────────────────────────────────────────────────────────────────────
+// Simple Test Cases — run in-browser to validate helpers & regressions
+function Tests() {
+  const [results, setResults] = useState<{ name: string; pass: boolean }[]>([]);
+
+  function assert(name: string, condition: boolean) {
+    return { name, pass: Boolean(condition) };
+  }
+
+  const run = () => {
+    const cases: { name: string; pass: boolean }[] = [];
+    // fmt
+    cases.push(assert("fmt formats number", fmt(12345.678) === new Intl.NumberFormat(undefined, { maximumFractionDigits: 6 }).format(12345.678)));
+    cases.push(assert("fmt handles string", fmt("1000") === new Intl.NumberFormat(undefined, { maximumFractionDigits: 6 }).format(1000)));
+    // clampPct
+    cases.push(assert("clampPct basic", clampPct(50, 100) === 50));
+    cases.push(assert("clampPct clamps >100", clampPct(150, 100) === 100));
+    cases.push(assert("clampPct clamps <0", clampPct(-10, 100) === 0));
+    cases.push(assert("clampPct zero target", clampPct(10, 0) === 0));
+    // address validator
+    cases.push(assert("valid XRPL address", isXrpClassicAddress("rDsbeomae4FXwgQTJp9Rs64Qg9vDiTCdBv")));
+    cases.push(assert("invalid XRPL address", !isXrpClassicAddress("abc123")));
+    // logo source builder includes placeholder as last fallback
+    const sources = buildLogoSources();
+    cases.push(assert("logo builder has placeholder fallback", sources.length > 0 && sources[sources.length-1].startsWith("data:image/svg+xml")));
+
+    // tokenomics 50/50 tests (math helper)
+    const rates = computeRates({ targetXrp: 50_000, raisedXrp: 50_000 });
+    cases.push(assert("tokenomics sum 100B", TOKENOMICS.totalSupply * (TOKENOMICS.presalePct + TOKENOMICS.liquidityPct) === 100_000_000_000));
+    cases.push(assert("presale math @50k with 51% pairing", (() => {
+      const R = 50_000;
+      const presale = TOKENOMICS.totalSupply * TOKENOMICS.presalePct;    // 50B
+      const lp = TOKENOMICS.totalSupply * TOKENOMICS.liquidityPct;       // 50B
+      const fiatsPerXrpPresale = presale / R;                            // 1,000,000
+      const fiatsPerXrpPool = lp / (TOKENOMICS.pairPctOfPresaleXrp * R); // ~1,960,784
+      return Math.round(fiatsPerXrpPresale) === 1_000_000 && Math.round(fiatsPerXrpPool) === 1_960_784;
+    })()));
+
+    // routing helper
+    const r1 = parseHashRoute("#/flipper/trump");
+    cases.push(assert("route flipper parse", (r1 as any).view === "flipper" && (r1 as any).slug === "trump"));
+    const r2 = parseHashRoute("#/anythingelse");
+    cases.push(assert("route default home", (r2 as any).view === "home"));
+
+    setResults(cases);
+  };
+
+  return (
+    <section className="py-6">
+      <div className="rounded-2xl p-4 bg-white/5 ring-1 ring-white/10">
+        <div className="flex items-center justify-between">
+          <div className="text-sm">Unit tests (helpers)</div>
+          <button onClick={run} className="text-sm rounded-xl px-3 py-1.5 ring-1 ring-white/20 hover:bg-white/10">Run tests</button>
+        </div>
+        <ul className="mt-3 space-y-1 text-xs">
+          {results.map((r, i) => (
+            <li key={i} className={r.pass ? "text-emerald-300" : "text-red-300"}>
+              {r.pass ? "✓" : "✗"} {r.name}
+            </li>
+          ))}
+          {results.length === 0 && <li className="text-white/50">(No results yet)</li>}
+        </ul>
+      </div>
+    </section>
+  );
+}
 
 

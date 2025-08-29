@@ -14,7 +14,9 @@ export const flippers: Flipper[] = [
     name: "Donald Trump",
     handle: "@realDonaldTrump",
     summary: "From skeptic to builder-friendly rhetoric.",
-    tweetUrls: [],
+    tweetUrls: [
+      "https://twitter.com/realDonaldTrump/status/1149472282584072192"
+    ],
     images: []
   },
   {
