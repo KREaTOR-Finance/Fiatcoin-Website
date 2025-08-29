@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState, useRef } from "react";
 import { motion } from "framer-motion";
 import { ArrowRight, Coins, Sparkles, Wallet, Twitter, Github, Mail, ExternalLink, Shield, ChevronRight, Copy, CheckCircle2 } from "lucide-react";
 
@@ -29,10 +29,13 @@ const FIATCOIN_CURRENCY = "FIAT"; // your currency code
 
 const PRESALE_XNS = "fiatcoin.xrp"; // Your XNS name for presale (preferred human‑readable address)
 const PRESALE_ADDRESS = "rsvjkcy91roaSeEdokijvmCbFBLoDFoXRP"; // Fallback XRPL classic address (replace with your real r‑address)
-const PRESALE_TARGET_XRP = 250000; // total goal in XRP (edit)
+const PRESALE_TARGET_XRP = 50000; // total goal in XRP (50k)
 let PRESALE_RAISED_XRP_DEFAULT = 0; // manually update as you raise funds (wire API later)
 
 const XRPL_WS = "wss://xrplcluster.com"; // Public XRPL WebSocket cluster
+// Social + contact (single source of truth)
+const SOCIAL_X = "https://x.com/fiatcoinxrp";
+const CONTACT_EMAIL = "fiatcoinxrp@gmail.com";
 
 // ──────────────────────────────────────────────────────────────────────────────
 // Minimal XRPL client (no external deps). Works in browser using WebSocket.
@@ -114,6 +117,28 @@ const clampPct = (raised: number, target: number) => {
 };
 const isXrpClassicAddress = (s: string) => /^r[1-9A-HJ-NP-Za-km-z]{24,34}$/.test(String(s || "").trim());
 
+// Tokenomics helper
+export function computeTokenomics({ total, presalePct, liquidityPct, pairPctOfPresaleFunds }: { total: number; presalePct: number; liquidityPct: number; pairPctOfPresaleFunds: number; }) {
+  const pctSum = presalePct + liquidityPct;
+  if (total < 0 || presalePct < 0 || liquidityPct < 0 || pairPctOfPresaleFunds < 0) throw new Error("negative inputs");
+  if (Math.abs(pctSum - 1) > 1e-9) throw new Error("percentages must sum to 1.0");
+  const presaleTokens = Math.floor(total * presalePct);
+  const liquidityTokens = Math.floor(total * liquidityPct);
+  const pairPct = Math.max(0, Math.min(1, pairPctOfPresaleFunds));
+  return { presaleTokens, liquidityTokens, pairPct };
+}
+
+// Simple hash-router utilities
+type Route = { view: "home" } | { view: "flipper"; slug: string };
+export function parseHashRoute(hash: string): Route {
+  const raw = (hash || "#").replace(/^#!/, "#");
+  if (raw.startsWith("#/flipper/")) {
+    const slug = raw.slice("#/flipper/".length).split("?")[0].split("#")[0];
+    return { view: "flipper", slug };
+  }
+  return { view: "home" };
+}
+
 // ──────────────────────────────────────────────────────────────────────────────
 // Logo handling with fallbacks & query param (?logo=)
 const PLACEHOLDER_DATA = (() => {
@@ -159,6 +184,7 @@ export default function App() {
   const [copiedXns, setCopiedXns] = useState(false);
   const [raised, setRaised] = useState(PRESALE_RAISED_XRP_DEFAULT);
   const [showConnect, setShowConnect] = useState(false);
+  const [route, setRoute] = useState<Route>(() => parseHashRoute(window.location.hash));
 
   const xrplLite = useMemo(() => new XRPLClientLite(XRPL_WS), []);
 
@@ -168,6 +194,9 @@ export default function App() {
     if (isXrpClassicAddress(qAddr || "")) {
       handleConnected(qAddr!);
     }
+    const onHash = () => setRoute(parseHashRoute(window.location.hash));
+    window.addEventListener("hashchange", onHash);
+    return () => window.removeEventListener("hashchange", onHash);
   }, []);
 
   async function fetchBalances(acct: string) {
@@ -223,26 +252,33 @@ export default function App() {
     <div className="min-h-screen bg-black text-white">
       <SiteHeader connected={connected} address={address} onConnect={() => setShowConnect(true)} onDisconnect={disconnect} />
       <main className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-        <Hero />
-        <Presale
-          xns={PRESALE_XNS}
-          onCopyXns={copyXns}
-          copiedXns={copiedXns}
-          address={PRESALE_ADDRESS}
-          target={PRESALE_TARGET_XRP}
-          raised={raised}
-          percent={percent}
-          onCopyAddr={copyAddr}
-          copiedAddr={copiedAddr}
-        />
-        <XrpTribute />
-        <FlipperIndex />
-        <HowToBuy />
-        <ExplorerLinks />
-        <Disclaimers />
-        <Contact />
-        <Diagnostics xrplLite={xrplLite} />
-        <Tests />
+        {route.view === "home" && (
+          <>
+            <Hero />
+            <Presale
+              xns={PRESALE_XNS}
+              onCopyXns={copyXns}
+              copiedXns={copiedXns}
+              address={PRESALE_ADDRESS}
+              target={PRESALE_TARGET_XRP}
+              raised={raised}
+              percent={percent}
+              onCopyAddr={copyAddr}
+              copiedAddr={copiedAddr}
+            />
+            <Tokenomics />
+            <XrpTribute />
+            <FlipperIndex />
+            <HowToBuy />
+            <ExplorerLinks />
+            <Disclaimers />
+            <Contact />
+            <Diagnostics xrplLite={xrplLite} />
+          </>
+        )}
+        {route.view === "flipper" && (
+          <FlipperPage slug={route.slug} />
+        )}
       </main>
       <SiteFooter />
       <WalletBar
@@ -331,6 +367,8 @@ function Presale({ address, target, raised, percent, onCopyAddr, copiedAddr, xns
         <h2 className="text-3xl md:text-4xl font-bold">Presale</h2>
         <p className="text-white/70 mt-2 max-w-3xl">
           Preferred: send <strong>XRP</strong> to our <strong>XNS name</strong> <code className="px-1 rounded bg-white/10">{xns}</code>. If your wallet doesn’t support XNS, use the fallback XRPL classic address below.
+          <br />
+          <span className="text-white/60">Bringing back 2021 meme-coins energy—fair launch, real community, no bonding curves making someone else’s number go up.</span>
         </p>
       </div>
 
@@ -455,13 +493,89 @@ function FlipperIndex() {
             <div className="text-lg font-semibold">{p.name}</div>
             <div className="text-xs text-white/50">{p.handle}</div>
             <div className="text-sm mt-3 text-white/70">{p.blurb}</div>
-            <button className="mt-4 text-sm inline-flex items-center gap-1 rounded-xl px-3 py-1.5 ring-1 ring-white/20 hover:bg-white/10">
+            <a href={`#/flipper/${p.id}`} className="mt-4 inline-flex items-center gap-1 rounded-xl px-3 py-1.5 ring-1 ring-white/20 hover:bg-white/10 text-sm">
               View Meme <ExternalLink className="h-3.5 w-3.5"/>
-            </button>
+            </a>
           </div>
         ))}
       </div>
       <div className="mt-6 text-sm text-white/50">Have a nomination? <a href="#contact" className="underline">Submit it via contact</a>.</div>
+    </section>
+  );
+}
+
+// Tweet embed component
+function EmbedTweet({ tweetUrl }: { tweetUrl: string }) {
+  const ref = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    const load = () => {
+      try {
+        // @ts-ignore
+        if ((window as any).twttr && (window as any).twttr.widgets && ref.current) {
+          // @ts-ignore
+          (window as any).twttr.widgets.load(ref.current);
+        }
+      } catch {}
+    };
+    // Load script once
+    // @ts-ignore
+    if (!(window as any).twttr) {
+      const s = document.createElement('script');
+      s.async = true;
+      s.src = 'https://platform.twitter.com/widgets.js';
+      s.onload = load;
+      s.onerror = () => {};
+      document.body.appendChild(s);
+    } else {
+      load();
+    }
+  }, [tweetUrl]);
+  return (
+    <div ref={ref} className="text-sm">
+      <blockquote className="twitter-tweet">
+        <a href={tweetUrl}>{tweetUrl}</a>
+      </blockquote>
+    </div>
+  );
+}
+
+function FlipperPage({ slug }: { slug: string }) {
+  // Inline minimal data to avoid new files if not present; can be replaced by src/data
+  const data: Record<string, { name: string; handle?: string; avatar?: string; summary: string; tweets: string[]; images: string[] }> = {
+    trump: { name: "Donald Trump", handle: "@realDonaldTrump", summary: "From skeptic to builder-friendly rhetoric.", tweets: [], images: [] },
+    cuban: { name: "Mark Cuban", handle: "@mcuban", summary: "Once harsh, now an active crypto infra investor.", tweets: [], images: [] },
+    dimon: { name: "Jamie Dimon", handle: "JPM exec", summary: "Public criticisms vs. institutional adoption.", tweets: [], images: [] },
+    fink: { name: "Larry Fink", handle: "BlackRock", summary: "“Tokenization is the future of markets.”", tweets: [], images: [] },
+  };
+  const item = data[slug];
+  if (!item) return (
+    <section className="py-16">
+      <div className="text-sm text-white/60">Unknown flipper. <a className="underline" href="#/">Go home</a>.</div>
+    </section>
+  );
+  return (
+    <section className="py-16">
+      <a href="#/" className="text-sm text-white/60 hover:underline">← Back</a>
+      <div className="mt-4 flex items-center gap-3">
+        <div className="h-12 w-12 rounded-full bg-white/10 flex items-center justify-center">
+          <LogoImage className="h-12 w-12 rounded-full object-cover" />
+        </div>
+        <div>
+          <div className="text-xl font-semibold">{item.name}</div>
+          <div className="text-xs text-white/60">{item.handle}</div>
+        </div>
+      </div>
+      <div className="mt-3 text-white/70 text-sm">{item.summary}</div>
+      <div className="mt-6 grid md:grid-cols-2 gap-6">
+        <div className="space-y-4">
+          {item.tweets.length === 0 && <a className="text-sm underline" href={SOCIAL_X} target="_blank" rel="noreferrer">Follow on X for receipts</a>}
+          {item.tweets.map((u, i) => (<EmbedTweet key={i} tweetUrl={u} />))}
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          {item.images.map((src, i) => (<img key={i} src={src} className="rounded-xl ring-1 ring-white/10" />))}
+        </div>
+      </div>
+      <div className="mt-6 text-xs text-white/50">Public quotes and images are used under fair use for commentary and satire. Parody—no endorsement. If you’re featured and want a correction, contact <a className="underline" href={`mailto:${CONTACT_EMAIL}`}>{CONTACT_EMAIL}</a>.</div>
     </section>
   );
 }
@@ -487,6 +601,55 @@ function HowToBuy() {
         </div></li>
       </ol>
       <div className="mt-6 text-xs text-white/50">Always verify the issuer and addresses from our official channels. This is a meme project; not financial advice.</div>
+    </section>
+  );
+}
+
+// Tokenomics section
+function Tokenomics() {
+  const total = 100_000_000_000;
+  const presalePct = 0.30;
+  const liquidityPct = 0.70;
+  const pairPctOfPresaleFunds = 0.51;
+  const t = computeTokenomics({ total, presalePct, liquidityPct, pairPctOfPresaleFunds });
+  const rows = [
+    { label: "Presale", value: t.presaleTokens, pct: presalePct, color: "bg-white" },
+    { label: "Liquidity", value: t.liquidityTokens, pct: liquidityPct, color: "bg-white/60" },
+  ];
+  return (
+    <section className="py-16 border-t border-white/10">
+      <div className="mb-6">
+        <h2 className="text-3xl md:text-4xl font-bold">Tokenomics</h2>
+        <p className="text-white/70 mt-2 max-w-3xl">
+          This is how you start a meme: launch fair, pair deep, no bonding-curve shenanigans.
+        </p>
+      </div>
+      <div className="grid md:grid-cols-2 gap-6">
+        <div className="rounded-2xl p-5 bg-white/5 ring-1 ring-white/10">
+          <div className="text-sm text-white/60 mb-2">Supply & Allocations</div>
+          <div className="space-y-3">
+            {rows.map((r, i) => (
+              <div key={i}>
+                <div className="flex items-center justify-between text-sm">
+                  <div>{r.label}</div>
+                  <div className="text-white/70">{fmt(r.value)} ({fmt(r.pct*100, { maximumFractionDigits: 2 })}%)</div>
+                </div>
+                <div className="h-2 rounded-full bg-white/10">
+                  <div className={`h-2 rounded-full ${r.color}`} style={{ width: `${r.pct*100}%` }} />
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+        <div className="rounded-2xl p-5 bg-white/5 ring-1 ring-white/10 text-sm leading-relaxed">
+          <ul className="list-disc list-inside space-y-1">
+            <li><strong>Total Supply:</strong> {fmt(total)} FIAT</li>
+            <li><strong>Presale Allocation:</strong> 30% ({fmt(t.presaleTokens)} FIAT)</li>
+            <li><strong>Liquidity Allocation:</strong> 70% ({fmt(t.liquidityTokens)} FIAT)</li>
+            <li><strong>Pairing:</strong> 51% of presale XRP will be paired with the 70% liquidity allocation at launch to seed deep liquidity.</li>
+          </ul>
+        </div>
+      </div>
     </section>
   );
 }
@@ -535,9 +698,9 @@ function Contact() {
         <div className="rounded-2xl p-5 bg-white/5 ring-1 ring-white/10">
           <div className="text-sm text-white/70">Follow & repos</div>
           <div className="mt-3 grid gap-2">
-            <a className="inline-flex items-center gap-2 hover:underline" href="#" target="_blank" rel="noreferrer"><Twitter className="h-4 w-4" /> X / Twitter</a>
+            <a className="inline-flex items-center gap-2 hover:underline" href={SOCIAL_X} target="_blank" rel="noreferrer"><Twitter className="h-4 w-4" /> @fiatcoinxrp</a>
             <a className="inline-flex items-center gap-2 hover:underline" href="#" target="_blank" rel="noreferrer"><Github className="h-4 w-4" /> GitHub</a>
-            <a className="inline-flex items-center gap-2 hover:underline" href="mailto:hello@fiatcoin.app"><Mail className="h-4 w-4" /> hello@fiatcoin.app</a>
+            <a className="inline-flex items-center gap-2 hover:underline" href={`mailto:${CONTACT_EMAIL}`}><Mail className="h-4 w-4" /> {CONTACT_EMAIL}</a>
           </div>
         </div>
       </div>
@@ -651,9 +814,6 @@ function ConnectModal({ onClose, onConnectAddress }: { onClose: () => void; onCo
             <button type="button" onClick={onClose} className="px-3 py-1.5 rounded-xl ring-1 ring-white/15">Cancel</button>
           </div>
         </form>
-        <div className="text-xs text-white/40 mt-3">
-          Tip: In production you can replace this modal with a Xaman (XUMM) OAuth or payload deep‑link flow.
-        </div>
       </div>
     </div>
   );
@@ -696,53 +856,6 @@ function Diagnostics({ xrplLite }: { xrplLite: XRPLClientLite }) {
   );
 }
 
-// ──────────────────────────────────────────────────────────────────────────────
-// Simple Test Cases — run in-browser to validate helpers & regressions
-function Tests() {
-  const [results, setResults] = useState<{ name: string; pass: boolean }[]>([]);
-
-  function assert(name: string, condition: boolean) {
-    return { name, pass: Boolean(condition) };
-  }
-
-  const run = () => {
-    const cases: { name: string; pass: boolean }[] = [];
-    // fmt
-    cases.push(assert("fmt formats number", fmt(12345.678) === new Intl.NumberFormat(undefined, { maximumFractionDigits: 6 }).format(12345.678)));
-    cases.push(assert("fmt handles string", fmt("1000") === new Intl.NumberFormat(undefined, { maximumFractionDigits: 6 }).format(1000)));
-    // clampPct
-    cases.push(assert("clampPct basic", clampPct(50, 100) === 50));
-    cases.push(assert("clampPct clamps >100", clampPct(150, 100) === 100));
-    cases.push(assert("clampPct clamps <0", clampPct(-10, 100) === 0));
-    cases.push(assert("clampPct zero target", clampPct(10, 0) === 0));
-    // address validator
-    cases.push(assert("valid XRPL address", isXrpClassicAddress("rDsbeomae4FXwgQTJp9Rs64Qg9vDiTCdBv")));
-    cases.push(assert("invalid XRPL address", !isXrpClassicAddress("abc123")));
-    // logo source builder includes placeholder as last fallback
-    const sources = buildLogoSources();
-    cases.push(assert("logo builder has placeholder fallback", sources.length > 0 && sources[sources.length-1].startsWith("data:image/svg+xml")));
-
-    setResults(cases);
-  };
-
-  return (
-    <section className="py-6">
-      <div className="rounded-2xl p-4 bg-white/5 ring-1 ring-white/10">
-        <div className="flex items-center justify-between">
-          <div className="text-sm">Unit tests (helpers)</div>
-          <button onClick={run} className="text-sm rounded-xl px-3 py-1.5 ring-1 ring-white/20 hover:bg-white/10">Run tests</button>
-        </div>
-        <ul className="mt-3 space-y-1 text-xs">
-          {results.map((r, i) => (
-            <li key={i} className={r.pass ? "text-emerald-300" : "text-red-300"}>
-              {r.pass ? "✓" : "✗"} {r.name}
-            </li>
-          ))}
-          {results.length === 0 && <li className="text-white/50">(No results yet)</li>}
-        </ul>
-      </div>
-    </section>
-  );
-}
+// (Removed in-app unit tests panel for production build)
 
 
