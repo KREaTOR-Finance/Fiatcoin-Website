@@ -235,10 +235,7 @@ export default function App() {
     let cancel = false;
     const poll = async () => {
       try {
-        const [s, rec] = await Promise.all([
-          fetch("/api/presale/summary"),
-          fetch("/api/presale/recent")
-        ]);
+        const s = await fetch("/api/presale/summary");
         if (s.ok) {
           const js = await s.json();
           if (!cancel) {
@@ -248,10 +245,6 @@ export default function App() {
             if (typeof raisedVal === "number") setRaised(raisedVal);
             if (typeof js.walletBalanceXrp === "number") setPresaleWalletXrp(js.walletBalanceXrp);
           }
-        }
-        if (rec.ok) {
-          const jr = await rec.json();
-          if (!cancel && Array.isArray(jr.recent)) { setRecent(jr.recent); (window as any).__recentContribs = jr.recent; }
         }
       } catch {}
     };
@@ -538,24 +531,12 @@ function Presale({ address, target, raised, percent, onCopyAddr, copiedAddr, xns
           <div className="mt-3 h-2 w-full rounded-full bg-white/10">
             <div className="h-2 rounded-full bg-white" style={{ width: `${percent}%` }} />
           </div>
-          <div className="mt-4">
-            <div className="text-xs text-white/50 mb-1">Recent contributions</div>
-            <ul className="space-y-1 text-xs">
-              {((window as any).__recentContribs || []).map((e: { from: string; amountXrp: number; txHash?: string }, i: number) => (
-                <li key={i} className="flex items-center justify-between gap-3">
-                  <a className="truncate hover:underline" target="_blank" rel="noreferrer" href={e.txHash ? `https://xrpscan.com/tx/${e.txHash}` : `https://xrpscan.com/account/${e.from}`} title={e.from}>{e.from}</a>
-                  <span className="font-semibold">{fmt(e.amountXrp)} XRP</span>
-                </li>
-              ))}
-              {(!((window as any).__recentContribs || []).length) && <li className="text-white/40">(No contributions yet)</li>}
-            </ul>
-          </div>
+          {/* Recent contributions removed to reduce serverless function count */}
           <div className="mt-4 text-xs text-white/50">Note: Keep your transaction hash. Token distribution/claim details will follow.</div>
         </div>
       </div>
 
-      {/* Explorer Leaderboard (last 5 securely) */}
-      <ExplorerLeaderboard top={5} pages={60} />
+      {/* Leaderboard removed to reduce serverless function count */}
 
       {/* XNS caveats */}
       <div className="mt-6 text-xs text-white/50">
@@ -1106,60 +1087,7 @@ function Claim() {
   );
 }
 
-// Explorer Leaderboard Component
-function mask(addr: string) { return addr ? `${addr.slice(0,6)}…${addr.slice(-6)}` : addr; }
-function fmtXrp(n: number) { return Number(n||0).toLocaleString(undefined,{maximumFractionDigits:4}); }
-function timeAgo(ts: number) { if(!ts) return "—" as any; const s=((Date.now()-ts)/1000)|0; if(s<60) return `${s}s`; const m=(s/60)|0; if(m<60) return `${m}m`; const h=(m/60)|0; if(h<48) return `${h}h`; const d=(h/24)|0; return `${d}d`; }
-function useJson(url: string, intervalMs=20000){
-  const [data,setData]=useState<any>(null), [loading,setLoading]=useState(true);
-  useEffect(()=>{ let on=true as any, t:any=null; (async function run(){
-    try{ const r=await fetch(url); const j=await r.json(); if(on){ setData(j); setLoading(false);} }
-    catch{ if(on){ setData({ok:false}); setLoading(false);} }
-    t=setTimeout(run, intervalMs);
-  })(); return ()=>{ on=false; if(t) clearTimeout(t); }; },[url,intervalMs]);
-  return { data, loading };
-}
-function ExplorerLeaderboard({ top=5, pages=60 }: { top?: number; pages?: number; }){
-  const { data, loading } = useJson(`/api/presale/leaderboard?top=${top}&pages=${pages}`, 20000);
-  return (
-    <section className="rounded-2xl p-5 bg-white/5 ring-1 ring-white/10 mt-8">
-      <div className="flex items-center justify-between mb-3">
-        <h3 className="font-semibold">Top Contributors (Explorer)</h3>
-        <div className="text-sm text-white/60">{loading ? "Loading…" : data?.updatedAt ? `Updated ${timeAgo(data.updatedAt)} ago` : ""}</div>
-      </div>
-      {loading && <div className="h-24 animate-pulse bg-white/10 rounded" />}
-      {!loading && data?.ok && (
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead className="text-white/60">
-              <tr className="[&>th]:py-2 [&>th]:px-2 text-left"><th>#</th><th>Address</th><th className="text-right">Total XRP</th><th className="text-right">Contribs</th><th className="text-right">Last</th></tr>
-            </thead>
-            <tbody>
-              {(data.leaderboard||[]).slice(0, top).map((row:any,i:number)=> (
-                <tr key={row.address} className="[&>td]:py-2 [&>td]:px-2 hover:bg-white/5">
-                  <td className="w-10 text-white/60">{i+1}</td>
-                  <td><a href={`https://xrpscan.com/account/${row.address}`} target="_blank" rel="noreferrer" className="hover:underline">{mask(row.address)}</a></td>
-                  <td className="text-right font-semibold">{fmtXrp(row.totalXrp)}</td>
-                  <td className="text-right">{row.count||0}</td>
-                  <td className="text-right text-white/60">{timeAgo(row.last)}</td>
-                </tr>
-              ))}
-              {!(data?.leaderboard||[]).length && (
-                <tr><td colSpan={5} className="py-3 text-center text-white/50">(No contributions yet)</td></tr>
-              )}
-            </tbody>
-          </table>
-          <div className="mt-3 text-[11px] leading-relaxed text-white/50 space-y-1">
-            <div>Data sourced live from a public explorer; results may lag or be rate-limited.</div>
-            <div>Totals recomputed by scanning recent explorer pages; not a final presale snapshot.</div>
-            <div>Custodial/exchange sends appear under exchange wallets unless using unique Destination Tags.</div>
-          </div>
-        </div>
-      )}
-      {!loading && !data?.ok && <div className="text-sm text-red-300">Couldn't load leaderboard. Please refresh.</div>}
-    </section>
-  );
-}
+// Leaderboard component removed to reduce serverless function count
 
 // ──────────────────────────────────────────────────────────────────────────────
 // Diagnostics (basic connectivity test)
