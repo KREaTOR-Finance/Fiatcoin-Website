@@ -1,5 +1,6 @@
 import xrpl from "xrpl";
 import { getClient, formatIssuedAmount, isClassic } from "../_lib/xrpl.js";
+import { kvGet } from "../_lib/kv.js";
 
 function readJson(req) {
   return new Promise((resolve, reject) => {
@@ -13,8 +14,9 @@ export default async function handler(req, res) {
     const { address } = await readJson(req);
     if (!isClassic(address)) return res.status(400).json({ ok: false, error: "bad_address" });
 
-    let SNAPSHOT = {};
-    try { SNAPSHOT = JSON.parse(process.env.SNAPSHOT_JSON || "{}"); } catch {}
+    let snap = await kvGet("presale:snapshot:current");
+    let SNAPSHOT = snap?.snapshot || {};
+    if (!Object.keys(SNAPSHOT).length) { try { SNAPSHOT = JSON.parse(process.env.SNAPSHOT_JSON || "{}"); } catch {} }
     const amountOwed = SNAPSHOT[address];
     if (!amountOwed) return res.status(404).json({ ok: false, error: "not_in_snapshot" });
 

@@ -1,23 +1,20 @@
-const base = "https://xumm.app/api/v1";
+import { XummSdk } from "xumm-sdk";
 
-function headers() {
-  return {
-    "Content-Type": "application/json",
-    "X-API-Key": process.env.XUMM_API_KEY,
-    "X-API-Secret": process.env.XUMM_API_SECRET,
-  };
+function getSdk(){
+  const key = process.env.XUMM_API_KEY;
+  const secret = process.env.XUMM_API_SECRET;
+  if(!key || !secret) throw new Error("missing_xumm_credentials");
+  return new XummSdk(key, secret);
 }
 
-export async function xummCreatePayload(body) {
-  const r = await fetch(`${base}/payload`, { method: "POST", headers: headers(), body: JSON.stringify(body) });
-  if (!r.ok) throw new Error(`xummCreatePayload ${r.status}`);
-  return r.json();
+export async function xummCreatePayload(body){
+  const sdk = getSdk();
+  return sdk.payload.create(body);
 }
 
-export async function xummGetPayload(uuid) {
-  const r = await fetch(`${base}/payload/${uuid}`, { headers: headers() });
-  if (!r.ok) throw new Error(`xummGetPayload ${r.status}`);
-  return r.json();
+export async function xummGetPayload(uuid){
+  const sdk = getSdk();
+  return sdk.payload.get(uuid, true);
 }
 
 export default { xummCreatePayload, xummGetPayload };
