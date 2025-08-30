@@ -3,9 +3,19 @@ dist/
 .DS_Store
 *.log
 *.tmp
+.vercel/
+
+# Env files (do not commit secrets)
 .env
-*.local
+.env.local
+.env.*
+!.env.example
+
+# Coverage / misc
 coverage/
 vite.svg
 
-
+# Editors
+.vscode/
+.idea/
+Thumbs.db
