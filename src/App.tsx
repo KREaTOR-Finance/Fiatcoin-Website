@@ -44,6 +44,23 @@ const MANTRA_ATTRIBUTION = {
   tweetUrl: "https://twitter.com/JoelKatz/status/1678710724200128513",
 };
 
+// Simple meme tokenomics (authoritative numbers)
+const SIMPLE_TOKENOMICS = {
+  supply: 1_000_000_000,
+  taxes: "0/0",
+  allocations: {
+    presale: 420_000_000,
+    lp: 380_000_000,
+    treasury: 150_000_000,
+    grants: 5_000_000,
+    community: 45_000_000,
+  },
+};
+const PRESALE_PRICE_TOKENS_PER_XRP = 8400;
+const PRESALE_PRICE_XRP_PER_TOKEN = 0.0001190476;
+const LIQUIDITY_PLAN = { atT0PercentOfRaiseToLP: 69, postLaunchPercentOfRaiseToLP: 15 };
+const GOVERNANCE = { multisigModel: "2-of-3", joelKatzInvite: "@JoelKatz (David Schwartz)" };
+
 // Optional: 50/50 tokenomics model for presale math (UI remains unchanged)
 const TOKENOMICS = {
   totalSupply: 100_000_000_000,
@@ -368,6 +385,8 @@ function SiteHeader({ connected, address, onConnect, onDisconnect }: { connected
         </div>
         <nav className="hidden md:flex items-center gap-6 text-sm">
           <a href="#presale" className="hover:text-zinc-300">Presale</a>
+          <a href="#tokenomics" className="hover:text-zinc-300">Tokenomics</a>
+          <a href="#governance" className="hover:text-zinc-300">Governance</a>
           <a href="#tribute" className="hover:text-zinc-300">XRP Tribute</a>
           <a href="#flipper" className="hover:text-zinc-300">Flipper Index</a>
           <a href="#howto" className="hover:text-zinc-300">How to Buy</a>
@@ -428,18 +447,17 @@ function TeaseBanner({ target, percent }: { target: number; percent: number }) {
       <div className="rounded-3xl bg-white/5 ring-1 ring-white/10 p-6 md:p-8">
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-6">
           <div>
-            <h2 className="text-2xl md:text-3xl font-bold">
-              JoelKatz-y Challenge: Can a meme coordinate {fmt(target)} XRP?
-            </h2>
-            <p className="text-white/70 mt-2 max-w-prose">
-              <strong>Hypothesis:</strong> give a community a clear target and a ledger; the ledger settles truth, not promises.
-              We're aiming for <strong>{fmt(target)} XRP</strong>. If we hit it, <strong>51%</strong> of presale XRP is paired
-              with the <strong>50% liquidity allocation</strong> at launch. If we don't, the math still works and the joke stays funny.
-            </p>
+            <h2 className="text-2xl md:text-3xl font-bold">XRP HOLDER CHALLENGE</h2>
+            <div className="mt-3">
+              <div className="text-white/80 font-semibold">The Scoreboard: Signal, Not Noise</div>
+              <p className="text-white/70 max-w-prose mt-1">
+                The ledger is the only scoreboard that matters. {fmt(target)} XRP is the target—not for hype, for execution. The market doesn’t reward speeches; it rewards signals. Put your stake on‑chain, bring one more holder, and let the record decide. No drama. No detours. Results over opinions.
+              </p>
+            </div>
             <ul className="text-sm text-white/60 mt-3 space-y-1 list-disc list-inside">
-              <li>"By decree" is for fiat. Memes earn consensus.</li>
-              <li>No bonding curve, no mystery unlocks, no market-maker idols.</li>
-              <li>The ledger won't applaud—only your wallet can.</li>
+              <li>At T0 we add <strong>{LIQUIDITY_PLAN.atT0PercentOfRaiseToLP}%</strong> of the raise to LP at ~+15% above presale price.</li>
+              <li>First weeks we add another <strong>{LIQUIDITY_PLAN.postLaunchPercentOfRaiseToLP}%</strong> of the raise to LP (split weekly).</li>
+              <li>LP locked 12 months. Unsold presale tokens → LP & lock.</li>
             </ul>
           </div>
 
@@ -452,7 +470,7 @@ function TeaseBanner({ target, percent }: { target: number; percent: number }) {
               {fmt(percent, { maximumFractionDigits: 2 })}% of {fmt(target)} XRP
             </div>
             <a href="#presale" className="mt-4 inline-flex items-center gap-2 rounded-2xl bg-white text-black px-4 py-2 font-semibold">
-              Prove the meme <ArrowRight className="h-4 w-4" />
+              Accept the Challenge <ArrowRight className="h-4 w-4" />
             </a>
           </div>
         </div>
@@ -471,16 +489,14 @@ function Presale({ address, target, raised, percent, onCopyAddr, copiedAddr, xns
       <div className="mb-6">
         <h2 className="text-3xl md:text-4xl font-bold">Presale</h2>
         <div className="mt-3 text-white/70 text-sm">
-          {(() => {
-            const rates = computeRates({ targetXrp: PRESALE_TARGET_XRP, raisedXrp:  Math.max(raised, 0) });
-            const presaleRate = rates.fiatsPerXrp_ifTarget ? fmt(rates.fiatsPerXrp_ifTarget) : "—";
-            const poolRatio = rates.poolFiatsPerXrp_ifTarget ? fmt(Math.round(rates.poolFiatsPerXrp_ifTarget)) : "—";
-            return (
-              <div className="rounded-xl bg-white/5 ring-1 ring-white/10 p-3">
-                <div><strong>At target ({fmt(PRESALE_TARGET_XRP)} XRP):</strong> {presaleRate} FIAT/XRP presale rate; ~{poolRatio} FIAT/XRP initial pool ratio.</div>
-              </div>
-            );
-          })()}
+          <div className="rounded-xl bg-white/5 ring-1 ring-white/10 p-3">
+            <div>
+              <strong>Single round, fixed price.</strong> No wallet limits. Team buys at the same price.
+            </div>
+            <div className="mt-1">
+              Price: <strong>1 XRP = {fmt(PRESALE_PRICE_TOKENS_PER_XRP)}</strong> tokens (<code className="px-1 rounded bg-white/10">{PRESALE_PRICE_XRP_PER_TOKEN}</code> XRP/token). Target: <strong>{fmt(PRESALE_TARGET_XRP)} XRP</strong>.
+            </div>
+          </div>
         </div>
       </div>
 
@@ -540,7 +556,7 @@ function Presale({ address, target, raised, percent, onCopyAddr, copiedAddr, xns
 
       {/* XNS caveats */}
       <div className="mt-6 text-xs text-white/50">
-        Some wallets don't resolve XNS yet. If yours can't, paste the fallback r‑address. Always verify the resolved address before sending.
+        Some wallets don't resolve XNS yet. If yours can't, paste the fallback r‑address. Always verify the resolved address before sending. LP tokens locked 12 months; unsold presale tokens → LP & lock.
       </div>
     </section>
   );
@@ -559,6 +575,12 @@ function XrpTribute() {
           A short, respectful nod to the builders, the company, and the community: <strong>David Schwartz</strong> (CTO & distributed systems wizard), <strong>Brad Garlinghouse</strong> (CEO),
           and the <strong>Ripple</strong> team that helped push real-world payments, liquidity, and compliance conversations forward.
         </p>
+      </div>
+      <div className="mb-6 rounded-2xl p-4 bg-white/5 ring-1 ring-white/10" id="governance">
+        <div className="font-semibold">Governance & Trust</div>
+        <div className="text-sm text-white/70 mt-1">
+          We operate a {GOVERNANCE.multisigModel} Treasury Multisig. <strong>Community CTA:</strong> it’s our community’s mission to secure {GOVERNANCE.joelKatzInvite}’s approval to serve as a neutral signer. If he declines, we’ll nominate respected XRPL stewards and maintain the same {GOVERNANCE.multisigModel} standard. All signers will be published with addresses on‑chain.
+        </div>
       </div>
       <div className="grid md:grid-cols-3 gap-6">
         <Card title="David Schwartz" subtitle="CTO, Ripple">
@@ -729,7 +751,7 @@ function HowToBuy() {
           Create a trust line to <code className="px-1 rounded bg-white/10">{FIATCOIN_CURRENCY}</code> from issuer <code className="px-1 rounded bg-white/10">{FIATCOIN_ISSUER}</code> (we'll publish a deep‑link later).
         </div></li>
         <li className="flex items-start gap-3"><span className="mt-1 h-6 w-6 flex items-center justify-center rounded-full bg-white text-black text-sm font-bold">3</span><div>
-          During presale, send XRP to <code className="px-1 rounded bg-white/10">{PRESALE_XNS}</code>. If your wallet can't resolve XNS, use the fallback r‑address shown above.
+          During presale, send XRP to <code className="px-1 rounded bg-white/10">{PRESALE_XNS}</code>. If your wallet can't resolve XNS, use the fallback r‑address shown above. Price is fixed at 1 XRP = {fmt(PRESALE_PRICE_TOKENS_PER_XRP)} tokens.
         </div></li>
         <li className="flex items-start gap-3"><span className="mt-1 h-6 w-6 flex items-center justify-center rounded-full bg-white text-black text-sm font-bold">4</span><div>
           Press <strong>Connect Wallet</strong> to enter your XRPL address and view balances here.
@@ -742,46 +764,47 @@ function HowToBuy() {
 
 // Tokenomics section
 function Tokenomics() {
-  const total = TOKENOMICS.totalSupply;
-  const presalePct = TOKENOMICS.presalePct;
-  const liquidityPct = TOKENOMICS.liquidityPct;
-  const pairPctOfPresaleFunds = TOKENOMICS.pairPctOfPresaleXrp;
-  const t = computeTokenomics({ total, presalePct, liquidityPct, pairPctOfPresaleFunds });
+  const supply = SIMPLE_TOKENOMICS.supply;
   const rows = [
-    { label: "Presale", value: t.presaleTokens, pct: presalePct, color: "bg-white" },
-    { label: "Liquidity", value: t.liquidityTokens, pct: liquidityPct, color: "bg-white/60" },
+    { label: "Presale", value: SIMPLE_TOKENOMICS.allocations.presale, color: "bg-white" },
+    { label: "DEX Liquidity", value: SIMPLE_TOKENOMICS.allocations.lp, color: "bg-white/60" },
+    { label: "Treasury", value: SIMPLE_TOKENOMICS.allocations.treasury, color: "bg-white/30" },
+    { label: "Grants", value: SIMPLE_TOKENOMICS.allocations.grants, color: "bg-white/20" },
+    { label: "Community / Airdrops", value: SIMPLE_TOKENOMICS.allocations.community, color: "bg-white/10" },
   ];
   return (
-    <section className="py-16 border-t border-white/10">
+    <section id="tokenomics" className="py-16 border-t border-white/10">
       <div className="mb-6">
         <h2 className="text-3xl md:text-4xl font-bold">Tokenomics</h2>
-        <p className="text-white/70 mt-2 max-w-3xl">
-          This is how you start a meme: launch fair, pair deep, no bonding-curve shenanigans.
-        </p>
+        <p className="text-white/70 mt-2 max-w-3xl">Supply: {fmt(supply)} • Taxes: {SIMPLE_TOKENOMICS.taxes}</p>
       </div>
       <div className="grid md:grid-cols-2 gap-6">
         <div className="rounded-2xl p-5 bg-white/5 ring-1 ring-white/10">
           <div className="text-sm text-white/60 mb-2">Supply & Allocations</div>
           <div className="space-y-3">
-            {rows.map((r, i) => (
-              <div key={i}>
-                <div className="flex items-center justify-between text-sm">
-                  <div>{r.label}</div>
-                  <div className="text-white/70">{fmt(r.value)} ({fmt(r.pct*100, { maximumFractionDigits: 2 })}%)</div>
+            {rows.map((r, i) => {
+              const pct = (r.value / supply) * 100;
+              return (
+                <div key={i}>
+                  <div className="flex items-center justify-between text-sm">
+                    <div>{r.label}</div>
+                    <div className="text-white/70">{fmt(r.value)} ({fmt(pct, { maximumFractionDigits: 2 })}%)</div>
+                  </div>
+                  <div className="h-2 rounded-full bg-white/10">
+                    <div className={`h-2 rounded-full ${r.color}`} style={{ width: `${pct}%` }} />
+                  </div>
                 </div>
-                <div className="h-2 rounded-full bg-white/10">
-                  <div className={`h-2 rounded-full ${r.color}`} style={{ width: `${r.pct*100}%` }} />
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
         <div className="rounded-2xl p-5 bg-white/5 ring-1 ring-white/10 text-sm leading-relaxed">
           <ul className="list-disc list-inside space-y-1">
-            <li><strong>Total Supply:</strong> {fmt(total)} FIAT</li>
-            <li><strong>Presale Allocation:</strong> {fmt(presalePct*100, { maximumFractionDigits: 0 })}% ({fmt(t.presaleTokens)} FIAT)</li>
-            <li><strong>Liquidity Allocation:</strong> {fmt(liquidityPct*100, { maximumFractionDigits: 0 })}% ({fmt(t.liquidityTokens)} FIAT)</li>
-            <li><strong>Pairing:</strong> {fmt(pairPctOfPresaleFunds*100, { maximumFractionDigits: 0 })}% of presale XRP will be paired with the liquidity allocation at launch to seed deep liquidity.</li>
+            <li><strong>Total Supply:</strong> {fmt(supply)} FIAT</li>
+            <li><strong>Taxes:</strong> {SIMPLE_TOKENOMICS.taxes}</li>
+            <li><strong>Allocations:</strong> Presale {fmt(SIMPLE_TOKENOMICS.allocations.presale)} • LP {fmt(SIMPLE_TOKENOMICS.allocations.lp)} • Treasury {fmt(SIMPLE_TOKENOMICS.allocations.treasury)} • Grants {fmt(SIMPLE_TOKENOMICS.allocations.grants)} • Community {fmt(SIMPLE_TOKENOMICS.allocations.community)}</li>
+            <li><strong>Team:</strong> No team allocation (team buys in presale)</li>
+            <li><strong>LP & Trust:</strong> {LIQUIDITY_PLAN.atT0PercentOfRaiseToLP}% of raise to LP at T0; +{LIQUIDITY_PLAN.postLaunchPercentOfRaiseToLP}% over first weeks; LP locked 12m; issuer renounced/blackholed; treasury multisig; unsold presale → LP & lock.</li>
           </ul>
         </div>
       </div>
@@ -795,16 +818,16 @@ function UseOfFunds() {
       <h3 className="text-2xl font-semibold mb-4">Use of Funds</h3>
       <div className="grid md:grid-cols-3 gap-4 text-sm">
         <div className="rounded-2xl p-4 bg-white/5 ring-1 ring-white/10">
-          <div className="font-semibold">Liquidity & Stability</div>
-          <div className="text-white/70 mt-1">51% of raise paired with 50B tokens at launch; no bonding curves.</div>
+          <div className="font-semibold">Launch Liquidity</div>
+          <div className="text-white/70 mt-1">{LIQUIDITY_PLAN.atT0PercentOfRaiseToLP}% of raise to LP at T0 (~+15% over presale price).</div>
         </div>
         <div className="rounded-2xl p-4 bg-white/5 ring-1 ring-white/10">
-          <div className="font-semibold">Heavy Buybacks (34%)</div>
-          <div className="text-white/70 mt-1">TWAP/ladder execution with caps and transparency; unused buffer rolls forward.</div>
+          <div className="font-semibold">Post‑Launch Adds</div>
+          <div className="text-white/70 mt-1">Additional {LIQUIDITY_PLAN.postLaunchPercentOfRaiseToLP}% to LP over first weeks, split weekly.</div>
         </div>
         <div className="rounded-2xl p-4 bg-white/5 ring-1 ring-white/10">
-          <div className="font-semibold">Ops/Marketing (15%)</div>
-          <div className="text-white/70 mt-1">Infra, security reviews, analytics, moderation, creative assets, grants, outreach.</div>
+          <div className="font-semibold">Ops / Treasury</div>
+          <div className="text-white/70 mt-1">Remainder to operations, treasury, and market maintenance as needed.</div>
         </div>
       </div>
     </section>
@@ -819,6 +842,7 @@ function ExplorerLinks() {
         <LinkTile title="XRPScan" href="https://xrpscan.com/" />
         <LinkTile title="Bithomp" href="https://bithomp.com/" />
         <LinkTile title="XPMarket (Pairs)" href="https://xpmarket.com/" />
+        <LinkTile title="On‑chain proofs (LP locks, renounce)" href="#governance" />
         <LinkTile title="Ripple (Company)" href="https://ripple.com/" />
         <LinkTile title="XRPL Docs" href="https://xrpl.org/" />
         <LinkTile title="Xaman (XUMM)" href="https://xaman.app/" />
@@ -913,7 +937,7 @@ function SiteFooter() {
   return (
     <footer className="mt-20 py-10 border-t border-white/10 text-center text-xs text-white/50">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-        © {new Date().getFullYear()} FIATCOIN — A tribute/meme project for the XRP community.
+        © {new Date().getFullYear()} FIATCOIN — A tribute/meme project for the XRP community. <a className="underline" href="#disclosures">Disclosures</a>
       </div>
     </footer>
   );
@@ -921,22 +945,15 @@ function SiteFooter() {
 
 function Disclaimers() {
   const lines = [
-    "This is satire. If you mistype your address, the blockchain will maintain a respectful silence.",
-    "Keys not backed up? That's a feature request for Past‑You, who is ignoring support tickets.",
-    "If a meme pumps your bags, it's still not monetary policy (however tempting).",
-    "Latency is fast; regulatory clarity is slow; neither cares about your bedtime.",
-    "If the code behaves as documented, it's a miracle. If it behaves as intended, buy a lottery ticket.",
-    "Schrödinger's Faucet: funds are simultaneously pending and confirmed until you refresh.",
-    "Never send funds you can't afford to forget existed in a parallel timeline.",
-    "Trustlines are like friendships: easy to add, awkward to explain at tax time.",
-    "The ledger is deterministic; human behavior is not. Plan accordingly.",
-    "NFA/NGMI/LOL: Choose two, preferably the first one.",
+    "Not investment advice. Tokens confer no rights or dividends.",
+    "Risk statement: market risk, execution risk, smart‑contract risk.",
+    "We will publish all locks/escrows, issuer renounce/blackhole, and LP adds on‑chain.",
   ];
   return (
-    <section className="py-16 border-t border-white/10">
-      <h3 className="text-2xl font-semibold mb-2">Quasi‑JoelKatz‑Style Disclaimers (Parody)</h3>
+    <section id="disclosures" className="py-16 border-t border-white/10">
+      <h3 className="text-2xl font-semibold mb-2">Disclosures</h3>
       <div className="text-white/60 text-sm max-w-3xl">
-        <p className="mb-3">In the spirit of dry humor and distributed systems pedantry, please enjoy the following disclaimers. They are <em>not</em> written by JoelKatz, but the vibe tries hard.</p>
+        <p className="mb-3">Tokens have no rights, dividends, or expectations of profit. Crypto involves risk.</p>
         <ul className="list-disc list-inside space-y-1">
           {lines.map((l, i) => <li key={i}>{l}</li>)}
         </ul>
@@ -1046,7 +1063,7 @@ function Claim() {
     <section id="claim" className="py-16 border-t border-white/10">
       <div className="mb-6">
         <h2 className="text-3xl md:text-4xl font-bold">Claim (pre‑LP)</h2>
-        <p className="text-white/70 mt-2 max-w-3xl">Connect Xaman, set a FIAT trustline, preview your allocation, then claim before AMM pool creation.</p>
+        <p className="text-white/70 mt-2 max-w-3xl">Connect Xaman, set a FIAT trustline, preview your allocation, then claim before AMM pool creation. Team buys in presale; no discounted allocation.</p>
       </div>
       <div className="grid md:grid-cols-3 gap-4">
         <div className="rounded-2xl p-4 bg-white/5 ring-1 ring-white/10">
@@ -1082,7 +1099,7 @@ function Claim() {
           {tx && <div className="mt-2 text-xs">Tx: <a className="underline" href={`https://xrpscan.com/tx/${tx}`} target="_blank" rel="noreferrer">{tx}</a></div>}
         </div>
       </div>
-      <div className="text-xs text-white/50 mt-4">Copycats exist; never send DMs; always verify <code className="px-1 rounded bg-white/10">{PRESALE_XNS}</code>; trustline requires a small XRPL reserve.</div>
+      <div className="text-xs text-white/50 mt-4">Copycats exist; never send DMs; always verify <code className="px-1 rounded bg-white/10">{PRESALE_XNS}</code>; trustline requires a small XRPL reserve. LP tokens locked 12 months; issuer renounce/blackhole to be published on-chain.</div>
     </section>
   );
 }
@@ -1152,17 +1169,10 @@ function Tests() {
     const sources = buildLogoSources();
     cases.push(assert("logo builder has placeholder fallback", sources.length > 0 && sources[sources.length-1].startsWith("data:image/svg+xml")));
 
-    // tokenomics 50/50 tests (math helper)
-    const rates = computeRates({ targetXrp: 50_000, raisedXrp: 50_000 });
-    cases.push(assert("tokenomics sum 100B", TOKENOMICS.totalSupply * (TOKENOMICS.presalePct + TOKENOMICS.liquidityPct) === 100_000_000_000));
-    cases.push(assert("presale math @50k with 51% pairing", (() => {
-      const R = 50_000;
-      const presale = TOKENOMICS.totalSupply * TOKENOMICS.presalePct;    // 50B
-      const lp = TOKENOMICS.totalSupply * TOKENOMICS.liquidityPct;       // 50B
-      const fiatsPerXrpPresale = presale / R;                            // 1,000,000
-      const fiatsPerXrpPool = lp / (TOKENOMICS.pairPctOfPresaleXrp * R); // ~1,960,784
-      return Math.round(fiatsPerXrpPresale) === 1_000_000 && Math.round(fiatsPerXrpPool) === 1_960_784;
-    })()));
+    // simple tokenomics checks
+    cases.push(assert("simple supply 1B", SIMPLE_TOKENOMICS.supply === 1_000_000_000));
+    cases.push(assert("price 1 XRP = 8400", PRESALE_PRICE_TOKENS_PER_XRP === 8400));
+    cases.push(assert("xrp per token ~0.0001190476", Math.abs(PRESALE_PRICE_XRP_PER_TOKEN - 0.0001190476) < 1e-12));
 
     // routing helper
     const r1 = parseHashRoute("#/flipper/trump");
